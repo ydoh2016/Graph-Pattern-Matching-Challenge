@@ -64,6 +64,46 @@ Vertex getNext(std::vector<Vertex>& result, const std::vector<DagInfo>& dag) {
   return -1;
 }
 
+bool verification(const std::vector<Vertex>& result, const Graph& data, const Graph& query, const CandidateSet &cs) {
+
+  //set test
+  std::set<Vertex> st;
+  for(auto e:result) {
+    st.insert(e);
+  }
+  if(st.size() != result.size()) {
+    std::cout << "There's duplicated vertex" << std::endl;
+    return false;
+  }
+  for(size_t i = 0; i < query.GetNumVertices(); ++i) {
+    size_t size = cs.GetCandidateSize(i);
+    bool chk = false;
+    for(size_t j = 0; j < size; ++j) {
+      if(result[i] == cs.GetCandidate(i, j)) {
+        chk = true;
+        break;
+      }
+    }
+    if(!chk){
+      std::cout << "Wrong label vertex...." << i << std::endl;
+      return false;
+    }
+  }
+  for(size_t i = 0; i < query.GetNumVertices(); ++i) {
+    size_t stOffset = query.GetNeighborStartOffset(i);
+    size_t endOffset = query.GetNeighborEndOffset(i);
+    for(size_t j = stOffset; j < endOffset; ++j) {
+      Vertex neighbor = query.GetNeighbor(j);
+      if(!data.IsNeighbor(result[i], result[neighbor])) {
+        std::cout << "Edge error...." << i << " " << neighbor << " "<< result[i] << " " << result[neighbor] << std::endl;
+        return false;
+      }
+    }
+  }
+  std::cout << "verification success" << std::endl;
+  return true;
+}
+
 void buildOrder(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, std::vector<Vertex>& order) {
   while(1) {
     Vertex next = getNext(result, dag);
@@ -90,6 +130,8 @@ void doCheck(const Graph &data, const Graph &query,
   if(id < 0) {
     static size_t count = 0;
     std::cout << "success " << ++count << std::endl;
+    if(!verification(result, data, query, cs))
+      getchar();
     // for(auto e:result) {
     //   std::cout << e << std::endl;
     // }
