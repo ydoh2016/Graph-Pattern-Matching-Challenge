@@ -130,9 +130,9 @@ void doCheck(const Graph &data, const Graph &query,
   if(id < 0) {
     static size_t count = 0;
     std::cout << "success " << ++count << "\r";
-    if(!verification(result, data, query, cs)) {
-      getchar();
-    }
+    // if(!verification(result, data, query, cs)) {
+    //   getchar();
+    // }
     // std::cout << "a ";
     // for(auto e:result) {
     //   std::cout << e << " ";
