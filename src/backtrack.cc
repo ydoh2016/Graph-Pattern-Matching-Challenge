@@ -21,7 +21,7 @@ void build(const Graph& graph, std::vector<DagInfo>& dag, int id) {
     return;
   size_t startN = graph.GetNeighborStartOffset(id);
   size_t endN = graph.GetNeighborEndOffset(id);
-  std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
+  // std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
   for(size_t i = startN; i < endN; ++i) {
     Vertex v = graph.GetNeighbor(i);
     if(dag[v].isEmpty()) {
@@ -31,14 +31,14 @@ void build(const Graph& graph, std::vector<DagInfo>& dag, int id) {
       dag[id].in.push_back(v);
     }
   }
-  std::cout << id << " ";
-  std::cout << "in" << " ";
-  for(auto e:dag[id].in)
-    std::cout << e << " ";
-  std::cout << "out" << " ";
-  for(auto e:dag[id].out)
-    std::cout << e << " ";
-  std::cout << std::endl;
+  // std::cout << id << " ";
+  // std::cout << "in" << " ";
+  // for(auto e:dag[id].in)
+  //   std::cout << e << " ";
+  // std::cout << "out" << " ";
+  // for(auto e:dag[id].out)
+  //   std::cout << e << " ";
+  // std::cout << std::endl;
   for(auto outV: dag[id].out) {
     build(graph, dag, outV);
   }
@@ -56,7 +56,7 @@ Vertex getNext(std::vector<Vertex>& result, const std::vector<DagInfo>& dag) {
         }
       }
       if(ok) {
-        std::cout << i << " is selected for next" << std::endl; 
+        //std::cout << i << " is selected for next" << std::endl; 
         return i;
       }
     }
@@ -100,7 +100,7 @@ bool verification(const std::vector<Vertex>& result, const Graph& data, const Gr
       }
     }
   }
-  std::cout << "verification success" << std::endl;
+  // std::cout << "verification success" << std::endl;
   return true;
 }
 
@@ -112,11 +112,11 @@ void buildOrder(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, st
     order.push_back(next);
     result[next] = 0;
   }
-  std::cout << "Order" << std::endl;
+  //std::cout << "Order" << std::endl;
   order.push_back(-1);
-  for(auto e:order) {
-    std::cout << e << std::endl;
-  }
+  // for(auto e:order) {
+  //   std::cout << e << std::endl;
+  // }
 }
 
 void doCheck(const Graph &data, const Graph &query,
@@ -128,13 +128,16 @@ void doCheck(const Graph &data, const Graph &query,
                                 ) {
   Vertex id = order[depth];
   if(id < 0) {
-    static size_t count = 0;
-    std::cout << "success " << ++count << std::endl;
-    if(!verification(result, data, query, cs))
+    // static size_t count = 0;
+    //std::cout << "success " << ++count << std::endl;
+    if(!verification(result, data, query, cs)) {
       getchar();
-    // for(auto e:result) {
-    //   std::cout << e << std::endl;
-    // }
+    }
+    std::cout << "a ";
+    for(auto e:result) {
+      std::cout << e << " ";
+    }
+    std::cout << std::endl;
     return;
   }
   int candidateSize = cs.GetCandidateSize(id);
@@ -169,17 +172,26 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   std::vector<DagInfo> dag;
   dag.resize(query.GetNumVertices());
   build(query, dag, 0);
-  for(int i = 0; i < dag.size(); i++) {
-    std::cout << i << " ";
-    std::cout << "in" << " ";
-    for(auto e:dag[i].in) {
-      std::cout << e << " ";
-    }
-    std::cout << "out" << " ";
-    for(auto e:dag[i].out)
-      std::cout << e << " ";
-    std::cout << std::endl;
+  size_t val = 1;
+  //std::cout << "candi sizes" << std::endl;
+  for(size_t i = 0; i < query.GetNumVertices(); i++) {
+    
+    val *= cs.GetCandidateSize(i);
+    //std::cout<<cs.GetCandidateSize(i)<<" "<<val<<std::endl;
   }
+  //std::cout << "max combination:" << val << std::endl;
+  // getchar();
+  // for(int i = 0; i < dag.size(); i++) {
+  //   std::cout << i << " ";
+  //   std::cout << "in" << " ";
+  //   for(auto e:dag[i].in) {
+  //     std::cout << e << " ";
+  //   }
+  //   std::cout << "out" << " ";
+  //   for(auto e:dag[i].out)
+  //     std::cout << e << " ";
+  //   std::cout << std::endl;
+  // }
   std::vector<Vertex> result;
   result.resize(query.GetNumVertices());
   std::vector<Vertex> order;
