@@ -128,16 +128,16 @@ void doCheck(const Graph &data, const Graph &query,
                                 ) {
   Vertex id = order[depth];
   if(id < 0) {
-    // static size_t count = 0;
-    //std::cout << "success " << ++count << std::endl;
+    static size_t count = 0;
+    std::cout << "success " << ++count << "\r";
     if(!verification(result, data, query, cs)) {
       getchar();
     }
-    std::cout << "a ";
-    for(auto e:result) {
-      std::cout << e << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "a ";
+    // for(auto e:result) {
+    //   std::cout << e << " ";
+    // }
+    // std::cout << std::endl;
     return;
   }
   int candidateSize = cs.GetCandidateSize(id);
@@ -204,4 +204,5 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   }
   std::set<Vertex> M;
   doCheck(data, query, cs, result, dag, order, M, 0);
+  std::cout << std::endl;
 }
