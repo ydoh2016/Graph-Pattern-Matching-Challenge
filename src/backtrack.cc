@@ -17,8 +17,29 @@ struct DagInfo{
   }
 };
 
+#include <unordered_map>
+
 size_t pointer = 0;
 std::vector<Vertex> remains;
+std::unordered_map<Vertex, size_t> vtxConvMap;
+size_t acc = 0;
+int* matchingArray = nullptr;
+
+int* buildMatchingArray(const Graph& data, const Graph& query, const CandidateSet& cs) {
+  
+  for(size_t i = 0; i < query.GetNumVertices(); ++i) {
+    for(size_t j = 0; j < cs.GetCandidateSize(i); ++j) {
+      Vertex v = cs.GetCandidate(i, j);
+      if(vtxConvMap.find(v) == vtxConvMap.end()) {
+        vtxConvMap.insert(std::make_pair(v, acc++));
+      }
+    }
+  }
+  matchingArray = new int[acc * acc];
+  for(int i = 0; i < acc*acc; ++i)
+    matchingArray[i] = -1;
+  return matchingArray;
+}
 
 void build(const Graph& graph, std::vector<DagInfo>& dag) {
 
@@ -293,7 +314,6 @@ void doCheck2(const Graph &data, const Graph &query,
   while(true) {
 
     Vertex id = order[depth];
-    // std::cout << "depth:" << depth << " "<<progress[depth] << " " << id <<".....................\n";
     
     if(id < 0) {
       static size_t count = 0;
@@ -317,13 +337,30 @@ void doCheck2(const Graph &data, const Graph &query,
     bool goNext = false;
     for(; progress[depth] < candidateSize; ++progress[depth]) {
       Vertex candi = cs.GetCandidate(id, progress[depth]);
+      size_t idxA = vtxConvMap[candi];
       bool ok = true;
       if(M.find(candi) != M.end()) {
         ok = false;
       }
       else {
         for(auto inID : dag[id].in) {
-          if(!data.IsNeighbor(candi, result[inID])) {
+          size_t idxB = vtxConvMap[result[inID]];
+          
+          if(idxA > idxB ) {
+            size_t tmp = idxA;
+            idxA = idxB;
+            idxB = tmp;
+          }
+          int& chk = matchingArray[idxA*acc + idxB];
+          if(chk == -1) {
+            if(data.IsNeighbor(candi, result[inID])) {
+              chk = 1;
+            }
+            else {
+              chk = 0;
+            }
+          }          
+          if(!chk) {
             ok = false;
             break;
           }
@@ -356,13 +393,15 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   std::vector<DagInfo> dag;
   dag.resize(query.GetNumVertices());
   size_t val = 1;
+  size_t accum = 0;
   //std::cout << "candi sizes" << std::endl;
   for(size_t i = 0; i < query.GetNumVertices(); i++) {
     
     val *= cs.GetCandidateSize(i);
+    accum += cs.GetCandidateSize(i);
     //std::cout<<cs.GetCandidateSize(i)<<" "<<val<<std::endl;
   }
-  std::cout << "max combination:" << val << std::endl;
+  std::cout << "max combination:" << val << " accum:" << accum << std::endl;
   // getchar();
   // for(int i = 0; i < dag.size(); i++) {
   //   std::cout << i << " ";
@@ -411,8 +450,9 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
+  buildMatchingArray(data, query, cs);
   std::set<Vertex> M;
   doCheck(data, query, cs, result, dag, order, M, 0);
-  // doCheck2(data, query, cs, result, dag, order, M);
+  //doCheck2(data, query, cs, result, dag, order, M);
   std::cout << std::endl;
 }
