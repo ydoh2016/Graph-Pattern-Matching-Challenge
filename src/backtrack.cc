@@ -4,6 +4,7 @@
  */
 
 #include "backtrack.h"
+//#define TRACE_DBG
 
 Backtrack::Backtrack() {}
 Backtrack::~Backtrack() {}
@@ -15,6 +16,38 @@ struct DagInfo{
     return in.empty() && out.empty();
   }
 };
+
+size_t pointer = 0;
+std::vector<Vertex> remains;
+
+void build(const Graph& graph, std::vector<DagInfo>& dag) {
+
+  while(pointer < remains.size()) {
+    Vertex id = remains[pointer];
+    size_t startN = graph.GetNeighborStartOffset(id);
+    size_t endN = graph.GetNeighborEndOffset(id);
+    // std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
+    for(size_t i = startN; i < endN; ++i) {
+      Vertex v = graph.GetNeighbor(i);
+      if(dag[v].isEmpty()) {
+        dag[id].out.push_back(v);
+        bool check = true;
+        for(auto e : remains) {
+          if(e == v) {
+            check = false;
+            break;
+          }
+        }
+        if(check)
+          remains.push_back(v);
+      }
+      else {
+        dag[id].in.push_back(v);
+      }
+    }
+    ++pointer;
+  }
+}
 
 void build(const Graph& graph, std::vector<DagInfo>& dag, int id) {
   if(!dag[id].isEmpty())
@@ -44,7 +77,10 @@ void build(const Graph& graph, std::vector<DagInfo>& dag, int id) {
   }
 }
 
-Vertex getNext(std::vector<Vertex>& result, const std::vector<DagInfo>& dag) {
+size_t pathCost = 0;
+
+Vertex getNext(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, std::vector<Vertex>& order) {
+  std::vector<Vertex> extendable;
   for(size_t i = 0; i < result.size(); i++) {
     auto v = result[i];
     if(v < 0) {
@@ -56,12 +92,37 @@ Vertex getNext(std::vector<Vertex>& result, const std::vector<DagInfo>& dag) {
         }
       }
       if(ok) {
-        //std::cout << i << " is selected for next" << std::endl; 
-        return i;
+        extendable.push_back(i);
       }
     }
   }
-  return -1;
+  size_t theMostMin = 0;
+  Vertex selected = -1;
+  for(auto e:extendable) {
+    size_t minStep = 10000;
+    for(auto inEdge:dag[e].in) {
+      for(size_t idx = 0; idx < order.size(); idx++) {
+        if(order[idx] == inEdge) {
+          if(idx < minStep) {
+            minStep = idx;
+          }
+          break;
+        }
+      }
+    }
+    if(selected < 0) {
+      selected = e;
+      theMostMin = minStep;
+    }
+    else
+    if(minStep > theMostMin) {
+      selected = e;
+      theMostMin = minStep;
+    }
+  }
+  pathCost += (order.size() - theMostMin);
+  std::cout << "selected, depth " << selected << "," << (order.size() - theMostMin) << std::endl; 
+  return selected;
 }
 
 bool verification(const std::vector<Vertex>& result, const Graph& data, const Graph& query, const CandidateSet &cs) {
@@ -104,19 +165,22 @@ bool verification(const std::vector<Vertex>& result, const Graph& data, const Gr
   return true;
 }
 
-void buildOrder(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, std::vector<Vertex>& order) {
+void buildOrder(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, std::vector<Vertex>& order, Vertex start = 0) {
+  pathCost = 0;
+  Vertex next = start;
   while(1) {
-    Vertex next = getNext(result, dag);
     if(next < 0)
       break;
     order.push_back(next);
     result[next] = 0;
+    next = getNext(result, dag, order);
   }
   //std::cout << "Order" << std::endl;
   order.push_back(-1);
   // for(auto e:order) {
   //   std::cout << e << std::endl;
   // }
+  std::cout << "Path Cost:" << pathCost << std::endl;
 }
 
 void doCheck(const Graph &data, const Graph &query,
@@ -141,7 +205,9 @@ void doCheck(const Graph &data, const Graph &query,
     return;
   }
   int candidateSize = cs.GetCandidateSize(id);
-  // std::cout << "candidateSize is "<< candidateSize << std::endl;
+#ifdef TRACE_DBG
+  std::cout << "try depth " << depth << " id" << id << " candidateSize is "<< candidateSize << std::endl;
+#endif
   for(size_t i = 0; i < candidateSize; ++i) {
     Vertex candi = cs.GetCandidate(id, i);
     bool ok = true;
@@ -157,11 +223,54 @@ void doCheck(const Graph &data, const Graph &query,
       }
     }
     if(ok) {
+      #ifdef TRACE_DBG
+      std::cout << "progress at " << depth << " id " << id << " to " << i << std::endl;
+      #endif
       result[id] = candi;
       M.insert(candi);
       doCheck(data, query, cs, result, dag, order, M, depth + 1);
       M.erase(candi);
       result[id] = -1;
+    }
+  }
+  #ifdef TRACE_DBG
+  std::cout << "fail at " << depth << std::endl;
+  #endif
+}
+
+void checkCandidate(const Graph &data, const Graph &query,
+                                const CandidateSet &cs,
+                                std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
+                                const std::vector<Vertex>& order) {
+  
+  for(int i = 0; i < order.size(); ++i) {
+    Vertex id = order[i];
+    if(id < 0) {
+      return;
+    }
+    int candidateSize = cs.GetCandidateSize(id);
+    // std::cout << "candidateSize is "<< candidateSize << std::endl;
+    for(size_t i = 0; i < candidateSize; ++i) {
+      bool checkOk = true;
+      Vertex candi = cs.GetCandidate(id, i);
+      for(auto outID : dag[id].out) {
+        bool oneOutCheckOk = false;
+        size_t targetCandiSize = cs.GetCandidateSize(outID);
+        for(size_t j = 0; j < targetCandiSize; ++j) {
+          Vertex targetCandi = cs.GetCandidate(outID, j);
+          if(data.IsNeighbor(candi, targetCandi)) {
+            oneOutCheckOk = true;
+            break;
+          }
+        }
+        if(!oneOutCheckOk) {
+          checkOk = false;
+          break;
+        }
+      }
+      if(!checkOk) {
+        std::cout << "Wow" << std::endl;
+      }
     }
   }
 }
@@ -171,6 +280,7 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   std::cout << "t " << query.GetNumVertices() << "\n";
   std::vector<DagInfo> dag;
   dag.resize(query.GetNumVertices());
+  remains.push_back(0);
   build(query, dag, 0);
   size_t val = 1;
   //std::cout << "candi sizes" << std::endl;
@@ -195,10 +305,24 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   std::vector<Vertex> result;
   result.resize(query.GetNumVertices());
   std::vector<Vertex> order;
+  // for(Vertex start = 0; start < query.GetNumVertices(); ++start) {
+  //   std::cout << "start from " << start << std::endl;
+  //   for(size_t i = 0;i < result.size(); ++i) {
+  //     result[i] = -1;
+  //   }
+  //   buildOrder(result, dag, order, start);
+  //   for(size_t i = 0;i < result.size(); ++i) {
+  //     result[i] = -1;
+  //   }
+  //   checkCandidate(data, query, cs, result, dag, order);
+  // }
+  // for(size_t i = 0;i < result.size(); ++i) {
+  //   result[i] = -1;
+  // }
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
-  buildOrder(result, dag, order);
+  buildOrder(result, dag, order, 0);
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
