@@ -241,7 +241,7 @@ void doCheck(const Graph &data, const Graph &query,
 void checkCandidate(const Graph &data, const Graph &query,
                                 const CandidateSet &cs,
                                 std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
-                                const std::vector<Vertex>& order) {
+                                const std::vector<Vertex>& order, int inOrOut) {
   
   for(int i = 0; i < order.size(); ++i) {
     Vertex id = order[i];
@@ -253,7 +253,8 @@ void checkCandidate(const Graph &data, const Graph &query,
     for(size_t i = 0; i < candidateSize; ++i) {
       bool checkOk = true;
       Vertex candi = cs.GetCandidate(id, i);
-      for(auto outID : dag[id].out) {
+      const std::vector<Vertex>& ways = inOrOut > 0 ? dag[id].out : dag[id].in;
+      for(auto outID : ways) {
         bool oneOutCheckOk = false;
         size_t targetCandiSize = cs.GetCandidateSize(outID);
         for(size_t j = 0; j < targetCandiSize; ++j) {
@@ -280,8 +281,6 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   std::cout << "t " << query.GetNumVertices() << "\n";
   std::vector<DagInfo> dag;
   dag.resize(query.GetNumVertices());
-  remains.push_back(0);
-  build(query, dag, 0);
   size_t val = 1;
   //std::cout << "candi sizes" << std::endl;
   for(size_t i = 0; i < query.GetNumVertices(); i++) {
@@ -289,7 +288,7 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
     val *= cs.GetCandidateSize(i);
     //std::cout<<cs.GetCandidateSize(i)<<" "<<val<<std::endl;
   }
-  //std::cout << "max combination:" << val << std::endl;
+  std::cout << "max combination:" << val << std::endl;
   // getchar();
   // for(int i = 0; i < dag.size(); i++) {
   //   std::cout << i << " ";
@@ -306,6 +305,14 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   result.resize(query.GetNumVertices());
   std::vector<Vertex> order;
   // for(Vertex start = 0; start < query.GetNumVertices(); ++start) {
+  //   order.clear();
+  //   for(auto& e:dag) {
+  //     e.in.clear();
+  //     e.out.clear();
+  //   }
+  //   remains.clear();
+  //   remains.push_back(start);
+  //   build(query, dag, start);
   //   std::cout << "start from " << start << std::endl;
   //   for(size_t i = 0;i < result.size(); ++i) {
   //     result[i] = -1;
@@ -314,11 +321,15 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   //   for(size_t i = 0;i < result.size(); ++i) {
   //     result[i] = -1;
   //   }
-  //   checkCandidate(data, query, cs, result, dag, order);
+  //   checkCandidate(data, query, cs, result, dag, order, 1);
+  //   for(size_t i = 0;i < result.size(); ++i) {
+  //     result[i] = -1;
+  //   }
+  //   checkCandidate(data, query, cs, result, dag, order, -1);
   // }
-  // for(size_t i = 0;i < result.size(); ++i) {
-  //   result[i] = -1;
-  // }
+  remains.clear();
+  remains.push_back(0);
+  build(query, dag, 0);
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
