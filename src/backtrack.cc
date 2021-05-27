@@ -276,6 +276,80 @@ void checkCandidate(const Graph &data, const Graph &query,
   }
 }
 
+void doCheck2(const Graph &data, const Graph &query,
+                                const CandidateSet &cs,
+                                std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
+                                const std::vector<Vertex>& order,
+                                std::set<Vertex>& M
+                                ) {
+
+  size_t depth = 0;
+  std::vector<size_t> progress;
+  progress.resize(order.size());
+  for(auto& e:progress) {
+    e = 0;
+  }
+
+  while(true) {
+
+    Vertex id = order[depth];
+    // std::cout << "depth:" << depth << " "<<progress[depth] << " " << id <<".....................\n";
+    
+    if(id < 0) {
+      static size_t count = 0;
+      std::cout << "success " << ++count << "\r";
+      // if(!verification(result, data, query, cs)) {
+        // getchar();
+      // }
+      // std::cout << "a ";
+      // for(auto e:result) {
+      //   std::cout << e << " ";
+      // }
+      // std::cout << std::endl;
+      depth--;
+      id = order[depth];
+      M.erase(result[id]);
+      result[id] = -1;
+      continue;
+    }
+    int candidateSize = cs.GetCandidateSize(id);
+    // std::cout << "candidateSize is "<< candidateSize << std::endl;
+    bool goNext = false;
+    for(; progress[depth] < candidateSize; ++progress[depth]) {
+      Vertex candi = cs.GetCandidate(id, progress[depth]);
+      bool ok = true;
+      if(M.find(candi) != M.end()) {
+        ok = false;
+      }
+      else {
+        for(auto inID : dag[id].in) {
+          if(!data.IsNeighbor(candi, result[inID])) {
+            ok = false;
+            break;
+          }
+        }
+      }
+      if(ok) {
+        result[id] = candi;
+        M.insert(candi);
+        progress[depth]++;
+        progress[++depth] = 0;
+        goNext = true;
+        break;
+      }
+    }
+    if(!goNext) {
+      if(depth <= 0)
+        break;
+      --depth;
+      id = order[depth];
+      M.erase(result[id]);
+      result[id] = -1;
+    }
+  }  
+}
+
+
 void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
                                 const CandidateSet &cs) {
   std::cout << "t " << query.GetNumVertices() << "\n";
@@ -339,5 +413,6 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
   }
   std::set<Vertex> M;
   doCheck(data, query, cs, result, dag, order, M, 0);
+  // doCheck2(data, query, cs, result, dag, order, M);
   std::cout << std::endl;
 }
