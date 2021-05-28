@@ -4,70 +4,50 @@
  */
 
 #include "backtrack.h"
+
+#include <unordered_map>
+
 //#define TRACE_DBG
 
 Backtrack::Backtrack() {}
 Backtrack::~Backtrack() {}
 
-struct DagInfo{
-  std::vector<Vertex> in;
-  std::vector<Vertex> out;
-  bool isEmpty(){
-    return in.empty() && out.empty();
-  }
-};
+int Backtrack::buildMatchingArray(const Graph& query, CandidateSet& cs,
+                       std::unordered_map<Vertex, Vertex>& vtxConvMap,
+                       std::unordered_map<Vertex, Vertex>& vtxRevConvMap,
+                       std::vector<int>& matchingArray, std::vector<int>& visitedMap) {
+  Vertex acc = 0; // order of candidate in whole candidates
 
-#include <unordered_map>
-
-size_t pointer = 0;
-std::vector<Vertex> remains;
-std::unordered_map<Vertex, Vertex> vtxConvMap;
-std::unordered_map<Vertex, Vertex> vtxRevConvMap;
-Vertex acc = 0;
-int* matchingArray = nullptr;
-int* visitedMap = nullptr;
-
-int* buildMatchingArray(const Graph& data, const Graph& query, const CandidateSet& cs) {
   for(size_t i = 0; i < query.GetNumVertices(); ++i) {
     for(size_t j = 0; j < cs.GetCandidateSize(i); ++j) {
-      Vertex v = cs.GetCandidate(i, j);
-      if(vtxConvMap.find(v) == vtxConvMap.end()) {
-        vtxConvMap.insert(std::make_pair(v, acc++));
-      }
-    }
-  }
-  matchingArray = new int[acc * acc];
-  for(int i = 0; i < acc*acc; ++i)
-    matchingArray[i] = -1;
-  return matchingArray;
-}
-
-int* buildMatchingArray2(const Graph& data, const Graph& query, CandidateSet& cs) {
-  for(size_t i = 0; i < query.GetNumVertices(); ++i) {
-    for(size_t j = 0; j < cs.GetCandidateSize(i); ++j) {
+      // loop for every candidates possible
       Vertex v = cs.GetCandidate(i, j);
       auto it = vtxConvMap.find(v);
       if(it == vtxConvMap.end()) {
-        vtxConvMap.insert(std::make_pair(v, acc));
-        vtxRevConvMap.insert(std::make_pair(acc, v));
-        cs.SetCandidate(i,j,acc);
+        // if no vertex v in vtxConvMap
+        vtxConvMap.insert(std::make_pair(v, acc)); // insert v mapped with order
+        vtxRevConvMap.insert(std::make_pair(acc, v)); // insert order mapped with v
+        cs.SetCandidate(i, j, acc); // build new candidate set with order mapped
         acc++;
-      }
-      else{
-        cs.SetCandidate(i, j, it->second);
+      } else {
+        // if vertex v already in vtxConvMap, which means that v is already visited by loop
+        cs.SetCandidate(i, j, it->second); // bulid new candidate set with order(same with v found before) mapped
       }
     }
   }
-  matchingArray = new int[acc * acc];
-  for(int i = 0; i < acc*acc; ++i)
-    matchingArray[i] = -1;
-  visitedMap = new int[acc];
+
+  matchingArray.resize(acc * acc); // used array for O(1) search time // todo : replace with vector?
+  for(int i = 0; i < acc * acc; ++i)
+    matchingArray[i] = -1; // initialize with -1
+
+  visitedMap.resize(acc);
   for(int i = 0; i < acc; ++i)
-    visitedMap[i] = 0;
-  return matchingArray;
+    visitedMap[i] = 0; // initialize with 0 // todo : why not check visited in if(it == vtxConvMap.end()) and else?
+
+  return acc;
 }
 
-void build(const Graph& graph, std::vector<DAGNode>& dag) {
+void Backtrack::build(const Graph& graph, std::vector<DAGNode>& dag, std::vector<Vertex>& remains, size_t pointer) {
   while(pointer < remains.size()) {
 
     Vertex id = remains[pointer];
@@ -99,22 +79,24 @@ void build(const Graph& graph, std::vector<DAGNode>& dag) {
   }
 }
 
-size_t pathCost = 0;
+size_t pathCost = 0; // todo : delete before submit
 
-Vertex getNext(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vector<Vertex>& order) {
-  
+Vertex Backtrack::getNext(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vector<Vertex>& order) {
   std::vector<Vertex> extendable;
+
   for(size_t i = 0; i < result.size(); i++) {
-    auto v = result[i]; // if result[i] is -1, can it accidentally match v by overflow?
+    auto v = result[i];
     if(v < 0) {
-      bool ok = true;
+      bool parentVisited = true;
       for(Vertex p : dag[i].GetParent()) {
-        if(result[p] < 0) { // parent node is not visited yet
-          ok = false;
+        if(result[p] < 0) { 
+          // one of parent node is not visited yet
+          parentVisited = false;
           break;
         }
       }
-      if(ok) { // all parent nodes are visited already
+      if(parentVisited) {
+        // all parent nodes are visited already
         extendable.push_back(i);
       }
     }
@@ -122,30 +104,35 @@ Vertex getNext(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vect
 
   size_t theMostMin = 0;
   Vertex selected = -1;
+
   for(auto e : extendable) {
-    size_t minStep = 10000;
-    for(auto inEdge:dag[e].GetParent()) {
+    size_t minStep = SIZE_MAX;
+
+    for(auto inEdge : dag[e].GetParent()) {
+      // inEdge is parent of vertex e, which is one of extendable vertices
       for(size_t idx = 0; idx < order.size(); idx++) {
         if(order[idx] == inEdge) {
-          if(idx < minStep) {
+          // loop in order, and find if parent of vertex e is one of query
+          if(idx < minStep) { // modify minStep(maximum number of loop)
             minStep = idx;
           }
           break;
         }
       }
     }
+
     if(selected < 0) {
-      selected = e;
+      // if this is a first of loop
+      selected = e; // vertex that last loop looked at
       theMostMin = minStep;
-    }
-    else
-    if(minStep > theMostMin) {
+    } else if(minStep > theMostMin) {
       selected = e;
-      theMostMin = minStep;
+      theMostMin = minStep; // for pathCost calculation // todo : delete before submit
     }
   }
+
   pathCost += (order.size() - theMostMin);
-  // std::cout << "selected, depth " << selected << "," << (order.size() - theMostMin) << std::endl; 
+
   return selected;
 }
 
@@ -189,121 +176,77 @@ bool verification(const std::vector<Vertex>& result, const Graph& data, const Gr
   return true;
 }
 
-void buildOrder(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vector<Vertex>& order, Vertex start = 0) {
+void Backtrack::buildOrder(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vector<Vertex>& order, Vertex start = 0) {
   pathCost = 0;
   Vertex next = start;
   while(1) {
-    if(next < 0)
+    if(next < 0) {
+      // if this vertex next is last vertex
       break;
+    }
     order.push_back(next);
     result[next] = 0;
     next = getNext(result, dag, order);
   }
   order.push_back(-1);
   #ifdef TRACE_DBG
-  std::cout << "Path Cost:" << pathCost << std::endl;
+  std::cout << "Path Cost : " << pathCost << std::endl;
   #endif
 }
 
-void checkCandidate(const Graph &data, const Graph &query,
-                                const CandidateSet &cs,
-                                std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
-                                const std::vector<Vertex>& order, int inOrOut) {
-  
-  for(int i = 0; i < order.size(); ++i) {
-    Vertex id = order[i];
-    if(id < 0) {
-      return;
-    }
-    int candidateSize = cs.GetCandidateSize(id);
-    // std::cout << "candidateSize is "<< candidateSize << std::endl;
-    for(size_t i = 0; i < candidateSize; ++i) {
-      bool checkOk = true;
-      Vertex candi = cs.GetCandidate(id, i);
-      const std::vector<Vertex>& ways = inOrOut > 0 ? dag[id].out : dag[id].in;
-      for(auto outID : ways) {
-        bool oneOutCheckOk = false;
-        size_t targetCandiSize = cs.GetCandidateSize(outID);
-        for(size_t j = 0; j < targetCandiSize; ++j) {
-          Vertex targetCandi = cs.GetCandidate(outID, j);
-          if(data.IsNeighbor(candi, targetCandi)) {
-            oneOutCheckOk = true;
-            break;
-          }
-        }
-        if(!oneOutCheckOk) {
-          checkOk = false;
-          break;
-        }
-      }
-      if(!checkOk) {
-        std::cout << "Wow" << std::endl;
-      }
-    }
-  }
-}
+void Backtrack::doCheck(const Graph &data, const CandidateSet &cs, std::vector<Vertex>& result,
+             std::vector<DAGNode>& dag, const std::vector<Vertex>& order,
+             std::vector<int> visitedMap, std::unordered_map<Vertex, Vertex> vtxRevConvMap,
+             std::vector<int> matchingArray, int acc) {
 
-void doCheck3(const Graph &data, const Graph &query,
-                                const CandidateSet &cs,
-                                std::vector<Vertex>& result, std::vector<DAGNode>& dag,
-                                const std::vector<Vertex>& order,
-                                int* visited
-                                ) {
+  size_t depth = 0; // search for n-th query vertex
 
-  size_t depth = 0;
   std::vector<size_t> progress;
   progress.resize(order.size());
-  for(auto& e:progress) {
+  for(auto& e : progress) {
     e = 0;
   }
-
+  
   while(true) {
-
     Vertex id = order[depth];
-    
+
     if(id < 0) {
+      // sucessfully arrived at last vertex
       static size_t count = 0;
       std::cout << "success " << ++count << "\r";
-      // if(!verification(result, data, query, cs)) {
-        // getchar();
-      // }
-      // std::cout << "a ";
-      // for(auto e:result) {
-      //   std::cout << e << " ";
-      // }
-      // std::cout << std::endl;
-      depth--;
-      id = order[depth];
-      visited[result[id]] = 0;
+      // get out from loop, once
+      id = order[--depth];
+      visitedMap[result[id]] = 0;
       result[id] = -1;
       continue;
     }
+    
     int candidateSize = cs.GetCandidateSize(id);
-    // std::cout << "depth:" << depth << " id:" << id << std::endl;
-    // std::cout << "candidateSize is "<< candidateSize << std::endl;
-    bool goNext = false;
-    for(; progress[depth] < candidateSize; ++progress[depth]) {
-      Vertex idxA = cs.GetCandidate(id, progress[depth]);
-      bool ok = true;
-      if(visited[idxA]) {
-        continue;
-      }
-      else {
-        for(auto inID : dag[id].GetParent()) {
-          Vertex idxB = result[inID];
+    bool goNext = false; // check invalid subgraph
 
-          // std::cout << "idxA, idxB, inID" << idxA << "," << idxB << "," << inID << std::endl;
-          
+    for(; progress[depth] < candidateSize; ++progress[depth]) {
+      // for all candidates in id
+      Vertex candiIdx = cs.GetCandidate(id, progress[depth]);
+      bool isValidSubgraph = true;
+
+      if(visitedMap[candiIdx]) {
+        // if this candidate have been already visited, look at next candidate
+        continue;
+      } else {
+        for(auto parent : dag[id].GetParent()) {
+          Vertex idxB = result[parent];
           int checkIdx = 0;
-          if(idxA > idxB ) {
-            checkIdx = idxB * acc + idxA;
+
+          if(candiIdx > idxB ) {
+            checkIdx = idxB * acc + candiIdx;
           }
-          else
-            checkIdx = idxA * acc + idxB;
-          int& chk = matchingArray[idxA*acc + idxB];
-          // std::cout << "idxA,idxB,chk " << idxA << "," << idxB << "," << chk << std::endl;
+          else {
+            checkIdx = candiIdx * acc + idxB;
+          }
+
+          int& chk = matchingArray[candiIdx * acc + idxB];
           if(chk == -1) {
-            Vertex convIdxA = vtxRevConvMap[idxA];
+            Vertex convIdxA = vtxRevConvMap[candiIdx];
             Vertex convIdxB = vtxRevConvMap[idxB];
             if(data.IsNeighbor(convIdxA, convIdxB)) {
               chk = 1;
@@ -311,40 +254,38 @@ void doCheck3(const Graph &data, const Graph &query,
             else {
               chk = 0;
             }
-            // std::cout << "conv(" << convIdxA <<","<<convIdxB<<","<<chk<<")"<<std::endl;
-          }          
+          }     
           if(!chk) {
-            ok = false;
+            isValidSubgraph = false;
             break;
           }
         }
       }
-      if(ok) {
-        result[id] = idxA;
-        visited[idxA] = 1;
+
+      if(isValidSubgraph) {
+        result[id] = candiIdx;
+        visitedMap[candiIdx] = 1;
         progress[depth]++;
         progress[++depth] = 0;
         goNext = true;
         break;
       }
     }
+
     if(!goNext) {
-      if(depth <= 0)
-        break;
-      --depth;
-      id = order[depth];
-      visited[result[id]] = 0;
+      if(depth <= 0) break;
+      id = order[--depth];
+      visitedMap[result[id]] = 0;
       result[id] = -1;
     }
   }  
 }
 
-
 void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, CandidateSet &cs) {
   
   std::cout << "t " << query.GetNumVertices() << "\n";
   
-  std::vector<DAGNode> dag;
+  std::vector<DAGNode> dag; // vector containing dagnodes
   dag.resize(query.GetNumVertices());
 
   size_t val = 1; // total number of routes to check
@@ -358,21 +299,26 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, Candidate
   std::cout << "max combination:" << val << " accum:" << accum << std::endl;
   #endif
 
+  std::vector<Vertex> remains;
+  remains.clear(); // visited vertex while build()
+  remains.push_back(0);
+  size_t pointer = 0;
+  build(query, dag, remains, pointer);
+
   std::vector<Vertex> result; // 
   result.assign(query.GetNumVertices(), -1);
-
   std::vector<Vertex> order; 
-
-  remains.clear(); //
-  remains.push_back(0);
-  build(query, dag);
 
   buildOrder(result, dag, order, 0);
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
   
-  buildMatchingArray2(data, query, cs);
-  doCheck3(data, query, cs, result, dag, order, visitedMap);
+  std::unordered_map<Vertex, Vertex> vtxConvMap;
+  std::unordered_map<Vertex, Vertex> vtxRevConvMap;
+  std::vector<int> matchingArray;
+  std::vector<int> visitedMap;
+  int acc = buildMatchingArray(query, cs, vtxConvMap, vtxRevConvMap, matchingArray, visitedMap);
+  doCheck(data, cs, result, dag, order, visitedMap, vtxRevConvMap, matchingArray, acc);
   std::cout << std::endl;
 }
