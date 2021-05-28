@@ -48,7 +48,7 @@ class Backtrack {
   ~Backtrack();
 
   void PrintAllMatches(const Graph &data, const Graph &query,
-                       const CandidateSet &cs);
+                       CandidateSet &cs);
 };
 
 #endif  // BACKTRACK_H_

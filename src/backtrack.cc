@@ -21,12 +21,13 @@ struct DagInfo{
 
 size_t pointer = 0;
 std::vector<Vertex> remains;
-std::unordered_map<Vertex, size_t> vtxConvMap;
-size_t acc = 0;
+std::unordered_map<Vertex, Vertex> vtxConvMap;
+std::unordered_map<Vertex, Vertex> vtxRevConvMap;
+Vertex acc = 0;
 int* matchingArray = nullptr;
+int* visitedMap = nullptr;
 
 int* buildMatchingArray(const Graph& data, const Graph& query, const CandidateSet& cs) {
-  
   for(size_t i = 0; i < query.GetNumVertices(); ++i) {
     for(size_t j = 0; j < cs.GetCandidateSize(i); ++j) {
       Vertex v = cs.GetCandidate(i, j);
@@ -41,24 +42,60 @@ int* buildMatchingArray(const Graph& data, const Graph& query, const CandidateSe
   return matchingArray;
 }
 
-void build(const Graph& graph, std::vector<DAGNode>& dag, int id) {
-  if(!dag[id].IsEmpty()) return; // if dagnode is empty, the node is unvisited by build
-  size_t startN = graph.GetNeighborStartOffset(id);
-  size_t endN = graph.GetNeighborEndOffset(id);
-  #ifdef TRACE_DBG
-  std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
-  #endif
-  for(size_t i = startN; i < endN; ++i) {
-    Vertex v = graph.GetNeighbor(i);
-    if(dag[v].IsEmpty()) { // unvisited node v shoud be a descendant of node id
-      dag[id].SetDescendant(v);
-    }
-    else {
-      dag[id].SetParent(v);
+int* buildMatchingArray2(const Graph& data, const Graph& query, CandidateSet& cs) {
+  for(size_t i = 0; i < query.GetNumVertices(); ++i) {
+    for(size_t j = 0; j < cs.GetCandidateSize(i); ++j) {
+      Vertex v = cs.GetCandidate(i, j);
+      auto it = vtxConvMap.find(v);
+      if(it == vtxConvMap.end()) {
+        vtxConvMap.insert(std::make_pair(v, acc));
+        vtxRevConvMap.insert(std::make_pair(acc, v));
+        cs.SetCandidate(i,j,acc);
+        acc++;
+      }
+      else{
+        cs.SetCandidate(i, j, it->second);
+      }
     }
   }
-  for(Vertex d: dag[id].GetDescendant()) {
-    build(graph, dag, d);
+  matchingArray = new int[acc * acc];
+  for(int i = 0; i < acc*acc; ++i)
+    matchingArray[i] = -1;
+  visitedMap = new int[acc];
+  for(int i = 0; i < acc; ++i)
+    visitedMap[i] = 0;
+  return matchingArray;
+}
+
+void build(const Graph& graph, std::vector<DAGNode>& dag) {
+  while(pointer < remains.size()) {
+
+    Vertex id = remains[pointer];
+    size_t startN = graph.GetNeighborStartOffset(id);
+    size_t endN = graph.GetNeighborEndOffset(id);
+
+    for(size_t i = startN; i < endN; ++i) {
+      Vertex v = graph.GetNeighbor(i); // v is neighbor of i
+      if(dag[v].IsEmpty()) {
+        // i is a parent of v
+        dag[id].SetDescendant(v);
+        // mark vertex visited by build()
+        bool check = true;
+        for(auto e : remains) {
+          if(e == v) {
+            check = false;
+            break;
+          }
+        }
+        if(check) 
+          remains.push_back(v);
+      }
+      else {
+        // v is a parent of i
+        dag[id].SetParent(v);
+      }
+    }
+    ++pointer;
   }
 }
 
@@ -108,7 +145,7 @@ Vertex getNext(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vect
     }
   }
   pathCost += (order.size() - theMostMin);
-  std::cout << "selected, depth " << selected << "," << (order.size() - theMostMin) << std::endl; 
+  // std::cout << "selected, depth " << selected << "," << (order.size() - theMostMin) << std::endl; 
   return selected;
 }
 
@@ -168,61 +205,6 @@ void buildOrder(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vec
   #endif
 }
 
-void doCheck(const Graph &data, const Graph &query,
-                                const CandidateSet &cs,
-                                std::vector<Vertex>& result, std::vector<DAGNode>& dag,
-                                const std::vector<Vertex>& order,
-                                std::set<Vertex>& M,
-                                int depth
-                                ) {
-  Vertex id = order[depth];
-  if(id < 0) {
-    static size_t count = 0;
-    std::cout << "success " << ++count << "\r";
-    // if(!verification(result, data, query, cs)) {
-    //   getchar();
-    // }
-    // std::cout << "a ";
-    // for(auto e:result) {
-    //   std::cout << e << " ";
-    // }
-    // std::cout << std::endl;
-    return;
-  }
-  int candidateSize = cs.GetCandidateSize(id);
-#ifdef TRACE_DBG
-  std::cout << "try depth " << depth << " id" << id << " candidateSize is "<< candidateSize << std::endl;
-#endif
-  for(size_t i = 0; i < candidateSize; ++i) {
-    Vertex candi = cs.GetCandidate(id, i);
-    bool ok = true;
-    if(M.find(candi) != M.end()) {
-      ok = false;
-    }
-    else {
-      for(auto inID : dag[id].GetParent()) {
-        if(!data.IsNeighbor(candi, result[inID])) {
-          ok = false;
-          break;
-        }
-      }
-    }
-    if(ok) {
-      #ifdef TRACE_DBG
-      std::cout << "progress at " << depth << " id " << id << " to " << i << std::endl;
-      #endif
-      result[id] = candi;
-      M.insert(candi);
-      doCheck(data, query, cs, result, dag, order, M, depth + 1);
-      M.erase(candi);
-      result[id] = -1;
-    }
-  }
-  #ifdef TRACE_DBG
-  std::cout << "fail at " << depth << std::endl;
-  #endif
-}
-
 void checkCandidate(const Graph &data, const Graph &query,
                                 const CandidateSet &cs,
                                 std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
@@ -261,11 +243,11 @@ void checkCandidate(const Graph &data, const Graph &query,
   }
 }
 
-void doCheck2(const Graph &data, const Graph &query,
+void doCheck3(const Graph &data, const Graph &query,
                                 const CandidateSet &cs,
-                                std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
+                                std::vector<Vertex>& result, std::vector<DAGNode>& dag,
                                 const std::vector<Vertex>& order,
-                                std::set<Vertex>& M
+                                int* visited
                                 ) {
 
   size_t depth = 0;
@@ -282,38 +264,54 @@ void doCheck2(const Graph &data, const Graph &query,
     if(id < 0) {
       static size_t count = 0;
       std::cout << "success " << ++count << "\r";
+      // if(!verification(result, data, query, cs)) {
+        // getchar();
+      // }
+      // std::cout << "a ";
+      // for(auto e:result) {
+      //   std::cout << e << " ";
+      // }
+      // std::cout << std::endl;
       depth--;
       id = order[depth];
-      M.erase(result[id]);
+      visited[result[id]] = 0;
       result[id] = -1;
       continue;
     }
     int candidateSize = cs.GetCandidateSize(id);
+    // std::cout << "depth:" << depth << " id:" << id << std::endl;
+    // std::cout << "candidateSize is "<< candidateSize << std::endl;
     bool goNext = false;
     for(; progress[depth] < candidateSize; ++progress[depth]) {
-      Vertex candi = cs.GetCandidate(id, progress[depth]);
-      size_t idxA = vtxConvMap[candi];
+      Vertex idxA = cs.GetCandidate(id, progress[depth]);
       bool ok = true;
-      if(M.find(candi) != M.end()) {
-        ok = false;
+      if(visited[idxA]) {
+        continue;
       }
       else {
-        for(auto inID : dag[id].in) {
-          size_t idxB = vtxConvMap[result[inID]];
+        for(auto inID : dag[id].GetParent()) {
+          Vertex idxB = result[inID];
+
+          // std::cout << "idxA, idxB, inID" << idxA << "," << idxB << "," << inID << std::endl;
           
+          int checkIdx = 0;
           if(idxA > idxB ) {
-            size_t tmp = idxA;
-            idxA = idxB;
-            idxB = tmp;
+            checkIdx = idxB * acc + idxA;
           }
+          else
+            checkIdx = idxA * acc + idxB;
           int& chk = matchingArray[idxA*acc + idxB];
+          // std::cout << "idxA,idxB,chk " << idxA << "," << idxB << "," << chk << std::endl;
           if(chk == -1) {
-            if(data.IsNeighbor(candi, result[inID])) {
+            Vertex convIdxA = vtxRevConvMap[idxA];
+            Vertex convIdxB = vtxRevConvMap[idxB];
+            if(data.IsNeighbor(convIdxA, convIdxB)) {
               chk = 1;
             }
             else {
               chk = 0;
             }
+            // std::cout << "conv(" << convIdxA <<","<<convIdxB<<","<<chk<<")"<<std::endl;
           }          
           if(!chk) {
             ok = false;
@@ -322,8 +320,8 @@ void doCheck2(const Graph &data, const Graph &query,
         }
       }
       if(ok) {
-        result[id] = candi;
-        M.insert(candi);
+        result[id] = idxA;
+        visited[idxA] = 1;
         progress[depth]++;
         progress[++depth] = 0;
         goNext = true;
@@ -335,14 +333,14 @@ void doCheck2(const Graph &data, const Graph &query,
         break;
       --depth;
       id = order[depth];
-      M.erase(result[id]);
+      visited[result[id]] = 0;
       result[id] = -1;
     }
   }  
 }
 
 
-void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, const CandidateSet &cs) {
+void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, CandidateSet &cs) {
   
   std::cout << "t " << query.GetNumVertices() << "\n";
   
@@ -360,25 +358,21 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, const Can
   std::cout << "max combination:" << val << " accum:" << accum << std::endl;
   #endif
 
-  std::vector<Vertex> result; //?
-  result.resize(query.GetNumVertices()); //?
-  std::vector<Vertex> order; //?
-  remains.clear(); //?
-  remains.push_back(0); //?
+  std::vector<Vertex> result; // 
+  result.assign(query.GetNumVertices(), -1);
 
-  build(query, dag, 0); // build query DAG
+  std::vector<Vertex> order; 
 
-  for(size_t i = 0;i < result.size(); ++i) { // set all result -1, which means unvisited
-    result[i] = -1;
-  }
+  remains.clear(); //
+  remains.push_back(0);
+  build(query, dag);
 
   buildOrder(result, dag, order, 0);
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
-
-  buildMatchingArray(data, query, cs);
-  std::set<Vertex> M;
-  doCheck(data, query, cs, result, dag, order, M, 0);
+  
+  buildMatchingArray2(data, query, cs);
+  doCheck3(data, query, cs, result, dag, order, visitedMap);
   std::cout << std::endl;
 }
