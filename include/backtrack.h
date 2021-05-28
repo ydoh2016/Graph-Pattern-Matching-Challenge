@@ -10,6 +10,38 @@
 #include "common.h"
 #include "graph.h"
 
+class DAGNode {
+  private:
+    std::vector<Vertex> parent;
+    std::vector<Vertex> descendant;
+  public:
+    inline bool IsRoot() const {
+      return parent.empty();
+    }
+      
+    inline std::vector<Vertex> GetParent() {
+      return parent;
+    }
+      
+    inline void SetParent(Vertex p) {
+      parent.push_back(p);
+      return;
+    }
+      
+    inline std::vector<Vertex> GetDescendant() {
+      return descendant;
+    }
+      
+    inline void SetDescendant(Vertex d) {
+      descendant.push_back(d);
+      return;
+    }
+      
+    inline bool IsEmpty() {
+      return parent.empty() && descendant.empty();
+    }
+};
+
 class Backtrack {
  public:
   Backtrack();

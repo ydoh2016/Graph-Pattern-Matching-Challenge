@@ -41,87 +41,53 @@ int* buildMatchingArray(const Graph& data, const Graph& query, const CandidateSe
   return matchingArray;
 }
 
-void build(const Graph& graph, std::vector<DagInfo>& dag) {
-
-  while(pointer < remains.size()) {
-    Vertex id = remains[pointer];
-    size_t startN = graph.GetNeighborStartOffset(id);
-    size_t endN = graph.GetNeighborEndOffset(id);
-    // std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
-    for(size_t i = startN; i < endN; ++i) {
-      Vertex v = graph.GetNeighbor(i);
-      if(dag[v].isEmpty()) {
-        dag[id].out.push_back(v);
-        bool check = true;
-        for(auto e : remains) {
-          if(e == v) {
-            check = false;
-            break;
-          }
-        }
-        if(check)
-          remains.push_back(v);
-      }
-      else {
-        dag[id].in.push_back(v);
-      }
-    }
-    ++pointer;
-  }
-}
-
-void build(const Graph& graph, std::vector<DagInfo>& dag, int id) {
-  if(!dag[id].isEmpty())
-    return;
+void build(const Graph& graph, std::vector<DAGNode>& dag, int id) {
+  if(!dag[id].IsEmpty()) return; // if dagnode is empty, the node is unvisited by build
   size_t startN = graph.GetNeighborStartOffset(id);
   size_t endN = graph.GetNeighborEndOffset(id);
-  // std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
+  #ifdef TRACE_DBG
+  std::cout << "build startN:" << startN << " endN:" << endN << std::endl;
+  #endif
   for(size_t i = startN; i < endN; ++i) {
     Vertex v = graph.GetNeighbor(i);
-    if(dag[v].isEmpty()) {
-      dag[id].out.push_back(v);
+    if(dag[v].IsEmpty()) { // unvisited node v shoud be a descendant of node id
+      dag[id].SetDescendant(v);
     }
     else {
-      dag[id].in.push_back(v);
+      dag[id].SetParent(v);
     }
   }
-  // std::cout << id << " ";
-  // std::cout << "in" << " ";
-  // for(auto e:dag[id].in)
-  //   std::cout << e << " ";
-  // std::cout << "out" << " ";
-  // for(auto e:dag[id].out)
-  //   std::cout << e << " ";
-  // std::cout << std::endl;
-  for(auto outV: dag[id].out) {
-    build(graph, dag, outV);
+  for(Vertex d: dag[id].GetDescendant()) {
+    build(graph, dag, d);
   }
 }
 
 size_t pathCost = 0;
 
-Vertex getNext(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, std::vector<Vertex>& order) {
+Vertex getNext(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vector<Vertex>& order) {
+  
   std::vector<Vertex> extendable;
   for(size_t i = 0; i < result.size(); i++) {
-    auto v = result[i];
+    auto v = result[i]; // if result[i] is -1, can it accidentally match v by overflow?
     if(v < 0) {
       bool ok = true;
-      for(auto inEdge : dag[i].in) {
-        if(result[inEdge] < 0) {
+      for(Vertex p : dag[i].GetParent()) {
+        if(result[p] < 0) { // parent node is not visited yet
           ok = false;
           break;
         }
       }
-      if(ok) {
+      if(ok) { // all parent nodes are visited already
         extendable.push_back(i);
       }
     }
   }
+
   size_t theMostMin = 0;
   Vertex selected = -1;
-  for(auto e:extendable) {
+  for(auto e : extendable) {
     size_t minStep = 10000;
-    for(auto inEdge:dag[e].in) {
+    for(auto inEdge:dag[e].GetParent()) {
       for(size_t idx = 0; idx < order.size(); idx++) {
         if(order[idx] == inEdge) {
           if(idx < minStep) {
@@ -186,7 +152,7 @@ bool verification(const std::vector<Vertex>& result, const Graph& data, const Gr
   return true;
 }
 
-void buildOrder(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, std::vector<Vertex>& order, Vertex start = 0) {
+void buildOrder(std::vector<Vertex>& result, std::vector<DAGNode>& dag, std::vector<Vertex>& order, Vertex start = 0) {
   pathCost = 0;
   Vertex next = start;
   while(1) {
@@ -196,17 +162,15 @@ void buildOrder(std::vector<Vertex>& result, const std::vector<DagInfo>& dag, st
     result[next] = 0;
     next = getNext(result, dag, order);
   }
-  //std::cout << "Order" << std::endl;
   order.push_back(-1);
-  // for(auto e:order) {
-  //   std::cout << e << std::endl;
-  // }
+  #ifdef TRACE_DBG
   std::cout << "Path Cost:" << pathCost << std::endl;
+  #endif
 }
 
 void doCheck(const Graph &data, const Graph &query,
                                 const CandidateSet &cs,
-                                std::vector<Vertex>& result, const std::vector<DagInfo>& dag,
+                                std::vector<Vertex>& result, std::vector<DAGNode>& dag,
                                 const std::vector<Vertex>& order,
                                 std::set<Vertex>& M,
                                 int depth
@@ -236,7 +200,7 @@ void doCheck(const Graph &data, const Graph &query,
       ok = false;
     }
     else {
-      for(auto inID : dag[id].in) {
+      for(auto inID : dag[id].GetParent()) {
         if(!data.IsNeighbor(candi, result[inID])) {
           ok = false;
           break;
@@ -318,14 +282,6 @@ void doCheck2(const Graph &data, const Graph &query,
     if(id < 0) {
       static size_t count = 0;
       std::cout << "success " << ++count << "\r";
-      // if(!verification(result, data, query, cs)) {
-        // getchar();
-      // }
-      // std::cout << "a ";
-      // for(auto e:result) {
-      //   std::cout << e << " ";
-      // }
-      // std::cout << std::endl;
       depth--;
       id = order[depth];
       M.erase(result[id]);
@@ -333,7 +289,6 @@ void doCheck2(const Graph &data, const Graph &query,
       continue;
     }
     int candidateSize = cs.GetCandidateSize(id);
-    // std::cout << "candidateSize is "<< candidateSize << std::endl;
     bool goNext = false;
     for(; progress[depth] < candidateSize; ++progress[depth]) {
       Vertex candi = cs.GetCandidate(id, progress[depth]);
@@ -387,72 +342,43 @@ void doCheck2(const Graph &data, const Graph &query,
 }
 
 
-void Backtrack::PrintAllMatches(const Graph &data, const Graph &query,
-                                const CandidateSet &cs) {
+void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, const CandidateSet &cs) {
+  
   std::cout << "t " << query.GetNumVertices() << "\n";
-  std::vector<DagInfo> dag;
+  
+  std::vector<DAGNode> dag;
   dag.resize(query.GetNumVertices());
-  size_t val = 1;
-  size_t accum = 0;
-  //std::cout << "candi sizes" << std::endl;
-  for(size_t i = 0; i < query.GetNumVertices(); i++) {
-    
-    val *= cs.GetCandidateSize(i);
-    accum += cs.GetCandidateSize(i);
-    //std::cout<<cs.GetCandidateSize(i)<<" "<<val<<std::endl;
+
+  size_t val = 1; // total number of routes to check
+  size_t accum = 0; // total number of candidates
+  for(Vertex v = 0; v < query.GetNumVertices(); v++) {
+    val *= cs.GetCandidateSize(v);
+    accum += cs.GetCandidateSize(v);
   }
+
+  #ifdef TRACE_DBG
   std::cout << "max combination:" << val << " accum:" << accum << std::endl;
-  // getchar();
-  // for(int i = 0; i < dag.size(); i++) {
-  //   std::cout << i << " ";
-  //   std::cout << "in" << " ";
-  //   for(auto e:dag[i].in) {
-  //     std::cout << e << " ";
-  //   }
-  //   std::cout << "out" << " ";
-  //   for(auto e:dag[i].out)
-  //     std::cout << e << " ";
-  //   std::cout << std::endl;
-  // }
-  std::vector<Vertex> result;
-  result.resize(query.GetNumVertices());
-  std::vector<Vertex> order;
-  // for(Vertex start = 0; start < query.GetNumVertices(); ++start) {
-  //   order.clear();
-  //   for(auto& e:dag) {
-  //     e.in.clear();
-  //     e.out.clear();
-  //   }
-  //   remains.clear();
-  //   remains.push_back(start);
-  //   build(query, dag, start);
-  //   std::cout << "start from " << start << std::endl;
-  //   for(size_t i = 0;i < result.size(); ++i) {
-  //     result[i] = -1;
-  //   }
-  //   buildOrder(result, dag, order, start);
-  //   for(size_t i = 0;i < result.size(); ++i) {
-  //     result[i] = -1;
-  //   }
-  //   checkCandidate(data, query, cs, result, dag, order, 1);
-  //   for(size_t i = 0;i < result.size(); ++i) {
-  //     result[i] = -1;
-  //   }
-  //   checkCandidate(data, query, cs, result, dag, order, -1);
-  // }
-  remains.clear();
-  remains.push_back(0);
-  build(query, dag, 0);
-  for(size_t i = 0;i < result.size(); ++i) {
+  #endif
+
+  std::vector<Vertex> result; //?
+  result.resize(query.GetNumVertices()); //?
+  std::vector<Vertex> order; //?
+  remains.clear(); //?
+  remains.push_back(0); //?
+
+  build(query, dag, 0); // build query DAG
+
+  for(size_t i = 0;i < result.size(); ++i) { // set all result -1, which means unvisited
     result[i] = -1;
   }
+
   buildOrder(result, dag, order, 0);
   for(size_t i = 0;i < result.size(); ++i) {
     result[i] = -1;
   }
+
   buildMatchingArray(data, query, cs);
   std::set<Vertex> M;
   doCheck(data, query, cs, result, dag, order, M, 0);
-  //doCheck2(data, query, cs, result, dag, order, M);
   std::cout << std::endl;
 }
