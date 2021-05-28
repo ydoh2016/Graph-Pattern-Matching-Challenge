@@ -15,6 +15,7 @@ class CandidateSet {
 
   inline size_t GetCandidateSize(Vertex u) const;
   inline Vertex GetCandidate(Vertex u, size_t i) const;
+  inline void SetCandidate(Vertex u, size_t i, Vertex v);
 
  private:
   std::vector<std::vector<Vertex>> cs_;
@@ -41,4 +42,7 @@ inline Vertex CandidateSet::GetCandidate(Vertex u, size_t i) const {
   return cs_[u][i];
 }
 
+inline void CandidateSet::SetCandidate(Vertex u, size_t i, Vertex v)  {
+  cs_[u][i] = v;
+}
 #endif  // CANDIDATE_SET_H_
