@@ -210,22 +210,15 @@ void Backtrack::doCheck(const Graph &data, const CandidateSet &cs, std::vector<V
     Vertex id = order[depth];
     if(id < 0) {
       // sucessfully arrived at last vertex
+      std::cout << "\n" << "a ";
+      for(int ord = 0; ord < depth; ord++) {
+        auto idx = order[ord];
+        std::cout << vtxRevConvMap.at(result[idx]) << " ";
+      }
       // get out from loop, once
       id = order[--depth];
-      std::cout << "\n" << "a ";
-      std::vector<Vertex> toPrint;
-      for(int print = depth; print >= 0; print--) {
-        toPrint.push_back(vtxRevConvMap.at(result[print]));
-      }
-      while(toPrint.size() != 1) {
-        std::cout << toPrint.back() << " ";
-        toPrint.pop_back();
-      }
-      std::cout << toPrint.back();
-        toPrint.pop_back();
       visitedMap[result[id]] = 0;
       result[id] = -1;
-      continue;
     }
     
     int candidateSize = cs.GetCandidateSize(id);
