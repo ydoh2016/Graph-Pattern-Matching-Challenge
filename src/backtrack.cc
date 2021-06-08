@@ -206,16 +206,23 @@ void Backtrack::doCheck(const Graph &data, const CandidateSet &cs, std::vector<V
   for(auto& e : progress) {
     e = 0;
   }
-  
   while(true) {
     Vertex id = order[depth];
-
     if(id < 0) {
       // sucessfully arrived at last vertex
-      static size_t count = 0;
-      std::cout << "success " << ++count << "\r";
       // get out from loop, once
       id = order[--depth];
+      std::cout << "\n" << "a ";
+      std::vector<Vertex> toPrint;
+      for(int print = depth; print >= 0; print--) {
+        toPrint.push_back(vtxRevConvMap.at(result[print]));
+      }
+      while(toPrint.size() != 1) {
+        std::cout << toPrint.back() << " ";
+        toPrint.pop_back();
+      }
+      std::cout << toPrint.back();
+        toPrint.pop_back();
       visitedMap[result[id]] = 0;
       result[id] = -1;
       continue;
@@ -278,12 +285,12 @@ void Backtrack::doCheck(const Graph &data, const CandidateSet &cs, std::vector<V
       visitedMap[result[id]] = 0;
       result[id] = -1;
     }
-  }  
+  }
 }
 
 void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, CandidateSet &cs) {
   
-  std::cout << "t " << query.GetNumVertices() << "\n";
+  std::cout << "t " << query.GetNumVertices();
   
   std::vector<DAGNode> dag; // vector containing dagnodes
   dag.resize(query.GetNumVertices());
