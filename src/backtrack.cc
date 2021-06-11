@@ -219,6 +219,9 @@ void Backtrack::doCheck(const Graph &data, const CandidateSet &cs, std::vector<V
       id = order[--depth];
       visitedMap[result[id]] = 0;
       result[id] = -1;
+      successCount++;
+      if(successCount >= 100000)
+        return;
     }
     
     int candidateSize = cs.GetCandidateSize(id);
@@ -319,6 +322,7 @@ void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, Candidate
   std::vector<int> matchingArray;
   std::vector<int> visitedMap;
   int acc = buildMatchingArray(query, cs, vtxConvMap, vtxRevConvMap, matchingArray, visitedMap);
+  successCount = 0;
   doCheck(data, cs, result, dag, order, visitedMap, vtxRevConvMap, matchingArray, acc);
   std::cout << std::endl;
 }

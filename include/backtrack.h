@@ -45,6 +45,7 @@ class DAGNode {
 };
 
 class Backtrack {
+  int successCount = 0;
  public:
   Backtrack();
   ~Backtrack();
